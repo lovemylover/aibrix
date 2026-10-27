@@ -1,0 +1,19 @@
+docs/request-flow-sequence.md
+  s_9e3085fcb7784c::t_f25f7c2d435475 1-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "d2114bdc514020a7b1d9e9439eb7b61988096f7b",
+  "prompts": {},
+  "sessions": {
+    "s_9e3085fcb7784c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c158a1f0-c8c0-4811-adfa-3a40eb4692df",
+        "model": "glm-5.2"
+      },
+      "human_author": "波儿与傲天 <oncwnuKk9-5XKqllib125Sk_K4Hg@git.weixin.qq.com>"
+    }
+  }
+}
