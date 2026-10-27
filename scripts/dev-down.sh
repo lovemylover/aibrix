@@ -77,8 +77,16 @@ fi
 
 # ---- 2. Undeploy aibrix ----------------------------------------------------
 if [[ "$UNDEPLOY" -eq 1 ]]; then
-  log "Removing vLLM mock (config/mock)..."
-  kubectl delete -k config/mock --ignore-not-found=true 2>/dev/null || true
+  # Order matters: test configs (HTTPRoute/env-patches) and mock (StormService/
+  # RoleSet) reference resources controlled by aibrix controllers. Delete them
+  # BEFORE `make undeploy` so the controllers can still reconcile deletions
+  # (e.g. clean up RoleSet-owned pods, release finalizers).
+
+  log "Removing test configurations (config/test)..."
+  kubectl delete -k config/test --ignore-not-found=true 2>/dev/null || true
+
+  log "Removing vLLM mock (development/app/config/mock)..."
+  kubectl delete -k development/app/config/mock --ignore-not-found=true 2>/dev/null || true
 
   log "Removing monitoring configurations..."
   for f in \
@@ -91,16 +99,36 @@ if [[ "$UNDEPLOY" -eq 1 ]]; then
   done
   kubectl delete -k config/prometheus --ignore-not-found=true 2>/dev/null || true
 
-  log "Removing test configurations (config/test)..."
-  kubectl delete -k config/test --ignore-not-found=true 2>/dev/null || true
-
   log "Undeploying aibrix controller (make undeploy)..."
   GOTOOLCHAIN="${GOTOOLCHAIN:-local}" make undeploy ignore-not-found=true \
     || warn "make undeploy had errors (continuing)"
 
+  # Finalizer safety net: after the controllers are gone, StormService/RoleSet
+  # instances may still have finalizers set, which blocks both their own
+  # deletion and the deletion of the CRDs (next step). Patch finalizers to []
+  # to let the API server reclaim them immediately.
+  log "Stripping finalizers from leftover StormService/RoleSet..."
+  for crd in stormservices.orchestration.aibrix.ai rolesets.orchestration.aibrix.ai; do
+    if kubectl get crd "$crd" >/dev/null 2>&1; then
+      for r in $(kubectl get "$crd" -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null); do
+        ns="${r%/*}"; name="${r#*/}"
+        kubectl patch "$crd" -n "$ns" "$name" \
+          -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null \
+          || warn "Could not patch finalizer on $crd $ns/$name"
+      done
+    fi
+  done
+
   log "Uninstalling CRDs and dependencies (make uninstall)..."
   GOTOOLCHAIN="${GOTOOLCHAIN:-local}" make uninstall ignore-not-found=true \
     || warn "make uninstall had errors (continuing)"
+
+  # Last-resort: delete any aibrix CRDs that still survived (usually none if
+  # finalizer patch worked). This is idempotent.
+  log "Force-deleting leftover aibrix CRDs (if any)..."
+  for crd in $(kubectl get crd 2>/dev/null | grep -E 'aibrix\.ai' | awk '{print $1}'); do
+    kubectl delete crd "$crd" --ignore-not-found=true 2>/dev/null || true
+  done
 
   log "Undeploy complete. Kind cluster '$CLUSTER_NAME' still exists."
 fi

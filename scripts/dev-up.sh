@@ -13,7 +13,11 @@
 #      if available) in the background
 #
 # Usage:
-#   scripts/dev-up.sh [--skip-build] [--skip-mock]
+#   scripts/dev-up.sh [--skip-build] [--mock <engine>]
+#     --mock <engine>: only deploy the specified engine's mock StormService.
+#                      Supported values: sglang, vllm, vllm-nixl, vllm-bucket,
+#                      trtllm, none. Default (no flag) = deploy all mocks.
+#                      --mock none is equivalent to the old --skip-mock.
 #
 # Prereqs:
 #   - docker, kind, kubectl, go (1.22+ or 1.26 with GOTOOLCHAIN=local)
@@ -40,14 +44,24 @@ KUBERAY_IMAGE="aibrix/kuberay-operator:v1.2.1-patch-20250726"
 GATEWAY_LOCAL_PORT="${GATEWAY_LOCAL_PORT:-8888}"
 
 SKIP_BUILD=0
-SKIP_MOCK=0
-for arg in "$@"; do
+MOCK_FILTER=""  # "" = all; or a single engine name (sglang/vllm/vllm-nixl/...); "none" = skip
+while [[ $# -gt 0 ]]; do
+  arg="$1"
   case "$arg" in
     --skip-build) SKIP_BUILD=1 ;;
-    --skip-mock)  SKIP_MOCK=1  ;;
+    --skip-mock)  MOCK_FILTER="none" ;;  # back-compat
+    --mock)       MOCK_FILTER="${2:-sglang}"; shift ;;
+    --mock=*)     MOCK_FILTER="${arg#--mock=}" ;;
     *) echo "Unknown arg: $arg" >&2; exit 2 ;;
   esac
+  shift
 done
+
+# Validate MOCK_FILTER
+case "$MOCK_FILTER" in
+  ""|none|sglang|vllm|vllm-nixl|vllm-bucket|trtllm) ;;
+  *) echo "Invalid --mock value: $MOCK_FILTER" >&2; exit 2 ;;
+esac
 
 log()  { echo -e "\033[1;34m[dev-up]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[dev-up] WARN:\033[0m $*" >&2; }
@@ -124,12 +138,32 @@ log "Removing external-router-e2e deployment (image not published)..."
 kubectl delete deploy -n aibrix-system external-router-e2e --ignore-not-found=true
 
 # ---- 5. Mock + monitoring ---------------------------------------------------
-if [[ "$SKIP_MOCK" -eq 0 ]]; then
+if [[ "$MOCK_FILTER" != "none" ]]; then
   log "Building and loading vLLM mock..."
   (cd development/app && docker build -t aibrix/vllm-mock:nightly -f Dockerfile .)
   kind load docker-image --name "$CLUSTER_NAME" aibrix/vllm-mock:nightly
-  log "Applying config/mock..."
-  kubectl apply -k config/mock || warn "config/mock apply had errors"
+
+  if [[ -z "$MOCK_FILTER" ]]; then
+    log "Applying config/mock (all engines)..."
+    kubectl apply -k development/app/config/mock || warn "config/mock apply had errors"
+  else
+    # kustomize overlay at development/app/config/mock-<engine>-only/ bundles
+    # shared components (ServiceAccount/RBAC) + the requested engine's StormService.
+    # Use --load-restrictor=LoadRestrictionsNone because the overlay references
+    # sibling files under ../mock/.
+    overlay_dir="development/app/config/mock-${MOCK_FILTER}-only"
+    if [[ ! -d "$overlay_dir" ]]; then
+      die "No mock overlay at $overlay_dir; available: $(ls development/app/config/ | grep '^mock-' | tr '\n' ' ')"
+    fi
+    log "Applying mock overlay: $overlay_dir"
+    KUSTOMIZE_BIN="${KUSTOMIZE_BIN:-bin/kustomize-v5.3.0}"
+    if [[ ! -x "$KUSTOMIZE_BIN" ]]; then
+      GOTOOLCHAIN="${GOTOOLCHAIN:-local}" make kustomize
+    fi
+    GOTOOLCHAIN="${GOTOOLCHAIN:-local}" "$KUSTOMIZE_BIN" build \
+      --load-restrictor=LoadRestrictionsNone "$overlay_dir" \
+      | kubectl apply -f - || warn "mock overlay apply had errors"
+  fi
 fi
 
 log "Applying Prometheus configurations (best-effort)..."

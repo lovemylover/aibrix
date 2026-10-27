@@ -1,0 +1,14 @@
+# Kustomize overlay: bare-minimum aibrix mock for sglang-only PD end-to-end test.
+# Includes: shared ServiceAccount/RBAC + StormService + base deployment templates.
+# Excludes: other engine mocks (vllm/nixl/trtllm/bucket) and qwen3 deployment,
+# so logs from the cluster are limited to sglang-related pods.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../templates/deployment
+  - ../mock/components.yaml
+  - ../mock/config-profile.yaml
+  - ../mock/replica-limits.yaml
+  - ../mock/sglang-pd-config.yaml
+patches:
+  - path: ../mock/latency-patch.yaml
