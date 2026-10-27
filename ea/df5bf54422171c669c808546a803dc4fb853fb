@@ -1,0 +1,32 @@
+scripts/dev-up.sh
+  s_9e3085fcb7784c::t_9fe93da7040e8d 48-49,57
+  s_9e3085fcb7784c::t_b14b1cb33c0e26 141,145-149,166
+  s_9e3085fcb7784c::t_0696eb03631242 150-165
+  s_9e3085fcb7784c::t_2125eaeb8cce8a 16-20
+  s_9e3085fcb7784c::t_a0e5a428f989a5 47,52-54,60-64
+  s_9e3085fcb7784c::t_bdb2b41f51a92c 65
+development/app/config/mock-sglang-only/kustomization.yaml
+  s_9e3085fcb7784c::t_7f3c502f54dfad 1-14
+docs/sglang-pd-request-flow.md
+  s_9e3085fcb7784c::t_65c513fff14c41 1-111
+scripts/dev-down.sh
+  s_9e3085fcb7784c::t_65e8fa07435311 80-89
+  s_9e3085fcb7784c::t_d654028fd4e6aa 106-121,126-131
+  s_9e3085fcb7784c::t_184fafcff2db5e 132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "eadf5bf54422171c669c808546a803dc4fb853fb",
+  "prompts": {},
+  "sessions": {
+    "s_9e3085fcb7784c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c158a1f0-c8c0-4811-adfa-3a40eb4692df",
+        "model": "glm-5.2"
+      },
+      "human_author": "波儿与傲天 <oncwnuKk9-5XKqllib125Sk_K4Hg@git.weixin.qq.com>"
+    }
+  }
+}
