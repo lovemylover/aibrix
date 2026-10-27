@@ -114,6 +114,10 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./api/..."
 	./hack/update-codegen.sh go $(PROJECT_DIR)/bin
 
+.PHONY: generate-deepcopy
+generate-deepcopy: controller-gen ## Generate only DeepCopy methods (skip clientset/lister/informer that require k8s code-generator toolchain compatibility).
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./api/..."
+
 .PHONY: update-codegen
 update-codegen:
 	sh ./hack/update-codegen.sh
@@ -138,7 +142,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run unit tests.
+test: manifests generate-deepcopy fmt vet envtest ## Run unit tests.
 	@echo "Running unit tests only..."
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v '/e2e\|/integration') -coverprofile cover.out
 
@@ -151,7 +155,7 @@ test-code-coverage: test
 	$(GO_TEST_COVERAGE) --config=./.github/.testcoverage.yml
 
 .PHONY: test-race-condition
-test-race-condition: manifests generate fmt vet envtest ## Run unit tests with race detection enabled and write cover.out.
+test-race-condition: manifests generate-deepcopy fmt vet envtest ## Run unit tests with race detection enabled and write cover.out.
 	CGO_ENABLED=1 KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -race $$(go list ./... | grep -v '/e2e\|/integration') -coverprofile cover.out
 
 .PHONY: test-integration test-integration-webhook test-integration-controller test-integration-gateway
@@ -237,16 +241,16 @@ python-ci:
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build manager and gateway-plugins binaries.
+build: manifests generate-deepcopy fmt vet ## Build manager and gateway-plugins binaries.
 	go build -o bin/manager cmd/controllers/main.go
 	go build -o bin/gateway-plugins cmd/plugins/main.go
 
 .PHONY: build-controller-manager
-build-controller-manager: manifests generate fmt vet ## Build controller-manager binary without ZMQ.
+build-controller-manager: manifests generate-deepcopy fmt vet ## Build controller-manager binary without ZMQ.
 	CGO_ENABLED=0 go build -tags="nozmq" -o bin/controller-manager cmd/controllers/main.go
 
 .PHONY: build-gateway-plugins
-build-gateway-plugins: manifests generate fmt vet ## Build gateway-plugins binary with ZMQ.
+build-gateway-plugins: manifests generate-deepcopy fmt vet ## Build gateway-plugins binary with ZMQ.
 	CGO_ENABLED=1 \
 	CGO_LDFLAGS='-lzmq -lsodium -lpthread -lm -lstdc++' \
 	go build -tags="zmq" \
@@ -254,7 +258,7 @@ build-gateway-plugins: manifests generate fmt vet ## Build gateway-plugins binar
 		-o bin/gateway-plugins cmd/plugins/main.go
 
 .PHONY: build-gateway-plugins-nozmq
-build-gateway-plugins-nozmq: manifests generate fmt vet ## Build gateway-plugins binary without ZMQ (for standalone mode).
+build-gateway-plugins-nozmq: manifests generate-deepcopy fmt vet ## Build gateway-plugins binary without ZMQ (for standalone mode).
 	CGO_ENABLED=0 go build -tags="nozmq" -o bin/gateway-plugins cmd/plugins/main.go
 
 .PHONY: build-console
@@ -270,7 +274,7 @@ build-metadata-service: ## Metadata service is now Python-based, use docker-buil
 	@echo "Metadata service is now Python-based. Use 'make docker-build-metadata-service' to build the Docker image."
 	@echo "The Go-based metadata service has been deprecated."
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
+run: manifests generate-deepcopy fmt vet ## Run a controller from your host.
 	go run ./cmd/controllers/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
@@ -527,7 +531,7 @@ GO_TEST_COVERAGE = $(LOCALBIN)/go-test-coverage-$(GO_TEST_COVERAGE_VERSION)
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.16.1
+CONTROLLER_TOOLS_VERSION ?= v0.23.0
 ENVTEST_VERSION ?= release-0.19
 GOLANGCI_LINT_VERSION ?= v2.13.1
 GO_TEST_COVERAGE_VERSION ?= v2.14.3
@@ -566,7 +570,7 @@ define go-install-tool
 set -e; \
 package=$(2)@$(3) ;\
 echo "Downloading $${package}" ;\
-GOBIN=$(LOCALBIN) go install $${package} ;\
+GOTOOLCHAIN=local GOBIN=$(LOCALBIN) go install $${package} ;\
 mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
 }
 endef
