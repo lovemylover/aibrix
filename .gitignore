@@ -31,6 +31,12 @@ __pycache__
 *.xml
 .*.pid
 
+# Local dev artifacts (scripts/dev-up.sh / dev-down.sh)
+.port-forward/
+
+# StarFactory working files
+.starFactory/
+
 # Node.js
 node_modules/
 dist/*
