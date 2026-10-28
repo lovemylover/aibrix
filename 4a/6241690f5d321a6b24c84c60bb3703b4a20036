@@ -1,0 +1,19 @@
+scripts/dev-down.sh
+  s_9e3085fcb7784c::t_0b633a6b5b78d7 80-97,100,103,112,114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4a6241690f5d321a6b24c84c60bb3703b4a20036",
+  "prompts": {},
+  "sessions": {
+    "s_9e3085fcb7784c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c158a1f0-c8c0-4811-adfa-3a40eb4692df",
+        "model": "glm-5.2"
+      },
+      "human_author": "波儿与傲天 <oncwnuKk9-5XKqllib125Sk_K4Hg@git.weixin.qq.com>"
+    }
+  }
+}
