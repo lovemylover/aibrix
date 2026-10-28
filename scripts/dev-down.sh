@@ -77,37 +77,14 @@ fi
 
 # ---- 2. Undeploy aibrix ----------------------------------------------------
 if [[ "$UNDEPLOY" -eq 1 ]]; then
-  # Order matters: test configs (HTTPRoute/env-patches) and mock (StormService/
-  # RoleSet) reference resources controlled by aibrix controllers. Delete them
-  # BEFORE `make undeploy` so the controllers can still reconcile deletions
-  # (e.g. clean up RoleSet-owned pods, release finalizers).
+  # Order matters: StormService/RoleSet have finalizers that the aibrix
+  # controller must release. In practice the controller can hang on these
+  # (long reconcile, self-blocking webhook, etc.) and `kubectl delete` would
+  # wait forever. So:
+  #   (a) Strip finalizers FIRST so deletions return immediately.
+  #   (b) Then delete mock resources, test config, and CRDs.
 
-  log "Removing test configurations (config/test)..."
-  kubectl delete -k config/test --ignore-not-found=true 2>/dev/null || true
-
-  log "Removing vLLM mock (development/app/config/mock)..."
-  kubectl delete -k development/app/config/mock --ignore-not-found=true 2>/dev/null || true
-
-  log "Removing monitoring configurations..."
-  for f in \
-    observability/monitor/envoy_metrics_service.yaml \
-    observability/monitor/service_monitor_controller_manager.yaml \
-    observability/monitor/service_monitor_gateway_plugin.yaml \
-    observability/monitor/service_monitor_gateway.yaml \
-    observability/monitor/service_monitor_vllm.yaml; do
-    kubectl delete -f "$f" --ignore-not-found=true 2>/dev/null || true
-  done
-  kubectl delete -k config/prometheus --ignore-not-found=true 2>/dev/null || true
-
-  log "Undeploying aibrix controller (make undeploy)..."
-  GOTOOLCHAIN="${GOTOOLCHAIN:-local}" make undeploy ignore-not-found=true \
-    || warn "make undeploy had errors (continuing)"
-
-  # Finalizer safety net: after the controllers are gone, StormService/RoleSet
-  # instances may still have finalizers set, which blocks both their own
-  # deletion and the deletion of the CRDs (next step). Patch finalizers to []
-  # to let the API server reclaim them immediately.
-  log "Stripping finalizers from leftover StormService/RoleSet..."
+  log "Stripping finalizers from StormService/RoleSet (so deletions don't hang)..."
   for crd in stormservices.orchestration.aibrix.ai rolesets.orchestration.aibrix.ai; do
     if kubectl get crd "$crd" >/dev/null 2>&1; then
       for r in $(kubectl get "$crd" -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null); do
@@ -118,6 +95,27 @@ if [[ "$UNDEPLOY" -eq 1 ]]; then
       done
     fi
   done
+
+  log "Removing test configurations (config/test)..."
+  kubectl delete -k config/test --ignore-not-found=true --timeout=30s 2>/dev/null || true
+
+  log "Removing vLLM mock (development/app/config/mock)..."
+  kubectl delete -k development/app/config/mock --ignore-not-found=true --timeout=60s 2>/dev/null || true
+
+  log "Removing monitoring configurations..."
+  for f in \
+    observability/monitor/envoy_metrics_service.yaml \
+    observability/monitor/service_monitor_controller_manager.yaml \
+    observability/monitor/service_monitor_gateway_plugin.yaml \
+    observability/monitor/service_monitor_gateway.yaml \
+    observability/monitor/service_monitor_vllm.yaml; do
+    kubectl delete -f "$f" --ignore-not-found=true --timeout=15s 2>/dev/null || true
+  done
+  kubectl delete -k config/prometheus --ignore-not-found=true --timeout=15s 2>/dev/null || true
+
+  log "Undeploying aibrix controller (make undeploy)..."
+  GOTOOLCHAIN="${GOTOOLCHAIN:-local}" make undeploy ignore-not-found=true \
+    || warn "make undeploy had errors (continuing)"
 
   log "Uninstalling CRDs and dependencies (make uninstall)..."
   GOTOOLCHAIN="${GOTOOLCHAIN:-local}" make uninstall ignore-not-found=true \
