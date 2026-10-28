@@ -1,0 +1,29 @@
+uninstall.sh
+  s_9e3085fcb7784c::t_5d6bbc5e4b2f24 1-18
+docs/quickstart-linux.md
+  s_9e3085fcb7784c::t_57d1a03b3eb4b4 1-446
+scripts/dev-up.sh
+  s_9e3085fcb7784c::t_c8dd07a7272d9b 298,306,311,316,321,330-331,334-346
+  s_9e3085fcb7784c::t_1a1cc6b8136fde 143-156,175-197,199-200,202-203,206,208,213-216,224,232-249,254,260-272,276,293
+  s_9e3085fcb7784c::t_dca9c7b6949e59 2-3,6-8,10-13,20,22-67,70-72,88-89,91-94,98-109,115-119,124-128,134-141
+  s_9e3085fcb7784c::t_6de1ff3b6590a7 363-373,377-382,386,392
+  s_9e3085fcb7784c::t_70a94565d02bf1 142
+install.sh
+  s_9e3085fcb7784c::t_b00b1fa196cc52 1-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b8066c2e418442893f147282ef52c61380a372c0",
+  "prompts": {},
+  "sessions": {
+    "s_9e3085fcb7784c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c158a1f0-c8c0-4811-adfa-3a40eb4692df",
+        "model": "glm-5.2"
+      },
+      "human_author": "波儿与傲天 <oncwnuKk9-5XKqllib125Sk_K4Hg@git.weixin.qq.com>"
+    }
+  }
+}
